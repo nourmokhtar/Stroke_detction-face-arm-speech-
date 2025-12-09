@@ -22,8 +22,7 @@ def get_client():
 
 # -------------------------------
 # 1️⃣ Explain facial symmetry features safely
-# -------------------------------
-def explain_features(features):
+def explain_features(features, severity=None):
     """
     features = {
         "smile_vertical_asymmetry": float,
@@ -31,7 +30,12 @@ def explain_features(features):
         "eye_horizontal_asymmetry": float,
         "general_facial_symmetry": float
     }
+    severity = float, optional severity value
     """
+
+    note = ""
+    if severity is not None and severity > 15:
+        note = "\n⚠️ Note: The overall facial asymmetry is quite pronounced, so some visual differences may be noticeable."
 
     prompt = f"""
 You will receive numbers describing facial symmetry.
@@ -43,7 +47,7 @@ Here are the values:
 - Smile vertical asymmetry: {features['smile_vertical_asymmetry']}
 - Mouth horizontal asymmetry: {features['mouth_horizontal_asymmetry']}
 - Eye horizontal asymmetry: {features['eye_horizontal_asymmetry']}
-- General facial symmetry: {features['general_facial_symmetry']}
+- General facial symmetry: {features['general_facial_symmetry']}{note}
 
 Describe what these might mean visually.
 Do NOT mention diseases or diagnosis.

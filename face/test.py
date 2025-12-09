@@ -165,7 +165,7 @@ while True:
                     final_severity = np.mean(severity_history)
                     print(f"\n[FINAL STABLE SEVERITY] {final_severity:.2f}")
                     print("[Visual Description]")
-                    print(explain_features(feats))
+                    print(explain_features(feats,final_severity))
                     break
             else:
                 stable_start_time = None
