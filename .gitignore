@@ -1,0 +1,11 @@
+stroke_env/
+env/
+*.pyc
+__pycache__/
+*.png
+*.jpg
+*.h5
+*.pkl
+
+face/*.h5
+face/*.pkl
