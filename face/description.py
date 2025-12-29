@@ -38,10 +38,11 @@ def explain_features(features, severity=None):
         note = "\n⚠️ Note: The overall facial asymmetry is quite pronounced, so some visual differences may be noticeable."
 
     prompt = f"""
-You will receive numbers describing facial symmetry.
+You will receive numerical values describing facial symmetry.
 These values are NOT for medical use. 
-Give only a general, non-medical interpretation describing visual balance,
-pose differences, or expression differences.
+Your task is to give a clear, strictly non-medical interpretation of visual balance.
+Focus on the severity of asymmetry, differences in pose, or expression, 
+and describe how noticeable or subtle each difference might appear visually.
 
 Here are the values:
 - Smile vertical asymmetry: {features['smile_vertical_asymmetry']}
@@ -49,8 +50,16 @@ Here are the values:
 - Eye horizontal asymmetry: {features['eye_horizontal_asymmetry']}
 - General facial symmetry: {features['general_facial_symmetry']}{note}
 
-Describe what these might mean visually.
-Do NOT mention diseases or diagnosis.
+Instructions:
+- Categorize each value as: "minimal/subtle", "moderate/noticeable", or "high/obvious" asymmetry.
+- If any value is greater than 15, interpret it as making the asymmetry more visually obvious than the number alone suggests.
+- Describe what these asymmetries would look like visually (e.g., slight tilt of mouth, one eye slightly higher, uneven smile).
+- At the end, provide a single conclusion summarizing the overall face:
+  - "Overall, the face appears normal/balanced"
+  - "Overall, the face is slightly asymmetrical/noticeable differences"
+  - "Overall, the face shows clear asymmetry/more pronounced differences"
+- Do NOT mention medical conditions, disorders, or make any diagnosis.
+- Keep the interpretation strictly visual and severity-focused.
 """
 
     client = get_client()

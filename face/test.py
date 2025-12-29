@@ -4,14 +4,16 @@ import numpy as np
 from tensorflow.keras.models import load_model
 from collections import deque
 import time
-
-from description import explain_features  # Make sure description.py is in same folder
+import os
+from .description import explain_features
 
 # -------------------------------
 # Load model
 # -------------------------------
-model = load_model("stroke_model.h5", compile=False)
-print("[INFO] Model loaded successfully!")
+
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "stroke_model.h5")
+model = load_model(MODEL_PATH, compile=False)
+print("[INFO] Face model loaded successfully!")
 
 # -------------------------------
 # Mediapipe Face Mesh
@@ -85,94 +87,93 @@ def align_face_pixels(crop, lm_px):
     return cv2.warpAffine(crop, M, (crop.shape[1], crop.shape[0]))
 
 # -------------------------------
-# Stability Logic
+# MAIN FUNCTION (IMPORTANT)
 # -------------------------------
-# -------------------------------
-# Stability Logic (Optimized, faster)
-# -------------------------------
-prediction_interval = 0.3      # every 0.3 seconds
-severity_history = deque(maxlen=3)  # fewer predictions needed
-stable_threshold = 2.0          # max allowed difference
-stable_duration = 1.5           # wait 1.5 seconds instead of 3
+def run_face_inference():
+    prediction_interval = 0.3
+    severity_history = deque(maxlen=3)
+    stable_threshold = 2.0
+    stable_duration = 1.5
 
-last_pred_time = 0
-stable_start_time = None
-final_severity = None
-# -------------------------------
-# Real-Time Loop
-# -------------------------------
-cap = cv2.VideoCapture(0)
-print("[INFO] Starting camera...")
+    last_pred_time = 0
+    stable_start_time = None
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+    cap = cv2.VideoCapture(0)
+    print("[INFO] Starting camera...")
 
-    h, w, _ = frame.shape
-    display = frame.copy()
-    now = time.time()
-
-    # Face detection
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(rgb)
-
-    if not results.multi_face_landmarks:
-        cv2.putText(display, "No face detected", (20,40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
-        cv2.imshow("Stroke Severity Detection", display)
-        if cv2.waitKey(1)==27:  # ESC
+    while True:
+        ret, frame = cap.read()
+        if not ret:
             break
-        continue
 
-    lm = results.multi_face_landmarks[0].landmark
-    x_min, y_min, x_max, y_max = get_face_bbox(lm, w, h)
-    centered = is_face_centered(x_min, y_min, x_max, y_max, w, h)
+        h, w, _ = frame.shape
+        display = frame.copy()
+        now = time.time()
 
-    cv2.rectangle(display, (x_min,y_min), (x_max,y_max),
-                  (0,255,0) if centered else (0,0,255), 2)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = face_mesh.process(rgb)
 
-    # Prediction timing
-    if centered and now - last_pred_time >= prediction_interval:
-        last_pred_time = now
+        if not results.multi_face_landmarks:
+            cv2.putText(display, "No face detected", (20,40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            cv2.imshow("Stroke Severity Detection", display)
+            if cv2.waitKey(1) == 27:
+                break
+            continue
 
-        face_crop = frame[y_min:y_max, x_min:x_max]
-        lm_px = [(int(p.x * w) - x_min, int(p.y * h) - y_min) for p in lm]
-        aligned = align_face_pixels(face_crop, lm_px)
+        lm = results.multi_face_landmarks[0].landmark
+        x_min, y_min, x_max, y_max = get_face_bbox(lm, w, h)
+        centered = is_face_centered(x_min, y_min, x_max, y_max, w, h)
 
-        img = cv2.resize(aligned, (224,224)) / 255.0
-        img = np.expand_dims(img, 0).astype(np.float32)
+        cv2.rectangle(display, (x_min,y_min), (x_max,y_max),
+                      (0,255,0) if centered else (0,0,255), 2)
 
-        handcrafted, feats = get_handcrafted_features(lm, w, h)
-        sev = model.predict([img, handcrafted])[0][0]
+        if centered and now - last_pred_time >= prediction_interval:
+            last_pred_time = now
 
-        severity_history.append(sev)
-        disp = np.mean(severity_history)
+            face_crop = frame[y_min:y_max, x_min:x_max]
+            lm_px = [(int(p.x * w) - x_min, int(p.y * h) - y_min) for p in lm]
+            aligned = align_face_pixels(face_crop, lm_px)
 
-        # Print every prediction
-        print(f"[PREDICTION] {sev:.2f} | Smoothed: {disp:.2f}")
+            img = cv2.resize(aligned, (224,224)) / 255.0
+            img = np.expand_dims(img, 0).astype(np.float32)
 
-        cv2.putText(display, f"Severity: {disp:.1f}",
-                    (x_min, y_min-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
-                    (0,0,255), 2)
+            handcrafted, feats = get_handcrafted_features(lm, w, h)
+            sev = model.predict([img, handcrafted], verbose=0)[0][0]
 
-        # Stability check
-        if len(severity_history) == severity_history.maxlen:
-            if max(severity_history) - min(severity_history) <= stable_threshold:
-                if stable_start_time is None:
-                    stable_start_time = now
-                elif now - stable_start_time >= stable_duration:
-                    final_severity = np.mean(severity_history)
-                    print(f"\n[FINAL STABLE SEVERITY] {final_severity:.2f}")
-                    print("[Visual Description]")
-                    print(explain_features(feats,final_severity))
-                    break
-            else:
-                stable_start_time = None
+            severity_history.append(sev)
+            disp = np.mean(severity_history)
 
-    cv2.imshow("Stroke Severity Detection", display)
-    if cv2.waitKey(1) == 27:
-        break
+            print(f"[PREDICTION] {sev:.2f} | Smoothed: {disp:.2f}")
 
-cap.release()
-cv2.destroyAllWindows()
+            cv2.putText(display, f"Severity: {disp:.1f}",
+                        (x_min, y_min-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0,0,255), 2)
+
+            if len(severity_history) == severity_history.maxlen:
+                if max(severity_history) - min(severity_history) <= stable_threshold:
+                    if stable_start_time is None:
+                        stable_start_time = now
+                    elif now - stable_start_time >= stable_duration:
+                        final_severity = float(np.mean(severity_history))
+                        cap.release()
+                        cv2.destroyAllWindows()
+
+                        return {
+                            "face_severity": final_severity,
+                            "face_description": explain_features(feats, final_severity)
+                        }
+                else:
+                    stable_start_time = None
+
+        cv2.imshow("Stroke Severity Detection", display)
+        if cv2.waitKey(1) == 27:
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    return {
+        "face_severity": None,
+        "face_description": "Face analysis not completed"
+    }

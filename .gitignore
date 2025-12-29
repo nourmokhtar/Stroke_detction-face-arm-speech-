@@ -9,3 +9,4 @@ __pycache__/
 
 face/*.h5
 face/*.pkl
+speech/*.pt

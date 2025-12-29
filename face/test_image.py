@@ -112,4 +112,4 @@ def predict_image(image_path):
 # -------------------------------
 # Example usage
 # -------------------------------
-predict_image(r"C:\Users\Lenovo-Thinkpad\Desktop\4AI\projet s1\strokedetection\sabaa3.png")  # Replace with your image path
+predict_image(r"C:\Users\Lenovo-Thinkpad\Desktop\4AI\projet s1\strokedetection\lol.jpg")  # Replace with your image path
